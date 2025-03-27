@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Motivational Runner Game</title>
+  <!-- Fonts: Playfair Display for headings, Montserrat for body -->
+  <link href="https://fonts.googleapis.com/css?family=Playfair+Display|Montserrat" rel="stylesheet" />
+  <style>
+    /* Color Palette & Typography from your CSS guide */
+    :root {
+      --primary: #FADCD9; /* Muted blush pink */
+      --neutral: #FFF9F4; /* Soft cream */
+      --contrast: #FFFFFF; /* Crisp white */
+      --accent: #D4AF37;  /* Subtle gold */
+      --secondary-text: #AAAAAA; /* Soft gray */
+    }
+    
+    body {
+      margin: 0;
+      padding: 0;
+      background: var(--neutral);
+      font-family: 'Montserrat', sans-serif;
+      overflow: hidden;
+    }
+    
+    h1, h2 {
+      font-family: 'Playfair Display', serif;
+      color: var(--primary);
+      letter-spacing: 1px;
+    }
+    
+    /* Instruction Screen */
+    #instructionScreen {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      background: var(--neutral);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 20px;
+      z-index: 10;
+    }
+    
+    #instructionScreen p {
+      font-size: 1.1rem;
+      color: var(--secondary-text);
+      margin-bottom: 20px;
+    }
+    
+    button {
+      font-family: 'Montserrat', sans-serif;
+      background: var(--primary);
+      border: 1px solid var(--accent);
+      color: var(--contrast);
+      padding: 10px 20px;
+      margin: 5px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    
+    button:hover {
+      transform: scale(1.05);
+    }
+    
+    /* Game Container & Canvas */
+    #gameContainer {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--neutral);
+    }
+    
+    #gameCanvas {
+      background: var(--neutral);
+      display: block;
+      margin: 0 auto;
+    }
+    
+    /* Mobile Jump Button */
+    #jumpButton {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 5;
+      padding: 15px 25px;
+      font-size: 1rem;
+      border-radius: 50px;
+      background: var(--primary);
+      border: 1px solid var(--accent);
+      display: none;
+    }
+    
+    /* Popup Styles */
+    #popup {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+    }
+    
+    #popupContent {
+      background: var(--contrast);
+      padding: 20px;
+      border: 2px solid var(--primary);
+      border-radius: 12px;
+      text-align: center;
+      max-width: 80%;
+    }
+    
+    #popupContent p {
+      margin-bottom: 15px;
+      font-size: 1.2rem;
+      color: #333;
+    }
+    
+    /* End Credits */
+    #credits {
+      position: absolute;
+      width: 100%;
+      height: 100vh;
+      background: #000;
+      color: #fff;
+      display: none;
+      overflow: hidden;
+      z-index: 30;
+    }
+    
+    #creditsContent {
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      font-family: 'Playfair Display', serif;
+      font-size: 1.5rem;
+      line-height: 2;
+      animation: scrollCredits 20s linear forwards;
+    }
+    
+    @keyframes scrollCredits {
+      from { top: 100%; }
+      to { top: -200%; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Instruction Screen -->
+  <div id="instructionScreen">
+    <h1>Welcome to Your Run!</h1>
+    <p>Get ready to overcome challenges and jump over obstacles with a burst of motivation. Use Spacebar on PC or tap the Jump button on mobile. Hit "Start" when you're ready.</p>
+    <button id="startButton">Start</button>
+  </div>
+
+  <!-- Game Container -->
+  <div id="gameContainer" style="display:none;">
+    <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <button id="jumpButton">Jump</button>
+  </div>
+
+  <!-- Popup for obstacle messages and collisions -->
+  <div id="popup">
+    <div id="popupContent">
+      <p id="popupMessage">Message</p>
+      <button id="continueButton">Continue</button>
+      <button id="restartButton" style="display:none;">Restart</button>
+    </div>
+  </div>
+  
+  <!-- End Credits Screen -->
+  <div id="credits">
+    <div id="creditsContent">
+      <p>Trust me, its u will like it</p>
+      <p>Congratulations!</p>
+      <p>blah blah</p>
+      <p>blah blah</p>
+      <p>blah blah</p>
+      <p>blah blah</p>
+      <p>blah blah</p>
+      <p>blah blah</p>
+    </div>
+  </div>
+  
+  <!-- Audio placeholder (for jump sound, etc.) -->
+  <audio id="jumpSound" src="https://freesound.org/data/previews/331/331912_3248244-lq.mp3"></audio>
+  
+  <script>
+    // Device detection and control setup
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    const jumpButton = document.getElementById('jumpButton');
+    if (isMobile) {
+      jumpButton.style.display = 'block';
+    }
+    
+    // DOM Elements
+    const instructionScreen = document.getElementById('instructionScreen');
+    const startButton = document.getElementById('startButton');
+    const gameContainer = document.getElementById('gameContainer');
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const popup = document.getElementById('popup');
+    const popupMessage = document.getElementById('popupMessage');
+    const continueButton = document.getElementById('continueButton');
+    const restartButton = document.getElementById('restartButton');
+    const credits = document.getElementById('credits');
+    
+    // Game Variables
+    let gameState = 'instructions'; // instructions, playing, paused, gameover, credits
+    let obstacles = [];
+    const totalObstacles = 10;
+    let currentObstacleIndex = 0;
+    let obstacleSpacing = 200; // pixels between obstacles (simulate 5 inches roughly)
+    
+    // Player properties
+    const player = {
+      x: 50,
+      y: 300,
+      width: 40,
+      height: 40,
+      vy: 0,
+      gravity: 0.8,
+      jumpForce: -15,
+      isJumping: false,
+      image: new Image(),
+      jumpImage: new Image(),
+      currentImg: null
+    };
+    // Set images (these will be replaced with normp.png and jumpp.png later)
+    player.image.src = 'normp.png';
+    player.jumpImage.src = 'jumpp.png';
+    player.currentImg = player.image;
+    
+    // Define messages for obstacles (one for each, with one special for bad dreams)
+    const obstacleMessages = [
+      "You're bigger than all the problems in life!",
+      "Keep pushing forward!",
+      "Every challenge makes you stronger!",
+      "You're unstoppable, babe!",
+      "Rise above the obstacles!",
+      "Don't let fear hold you down!",
+      "Your strength shines through!",
+      "Bad dreams? You're more powerful and faithful than any nightmare you had.",
+      "Embrace the journey, one leap at a time!",
+      "Victory is yours, keep running!"
+    ];
+    
+    // Create obstacles dynamically based on spacing
+    function createObstacles() {
+      obstacles = [];
+      let startX = canvas.width + 100;
+      for (let i = 0; i < totalObstacles; i++) {
+        obstacles.push({
+          x: startX + i * obstacleSpacing,
+          y: 320, // ground level
+          width: 40,
+          height: 40,
+          message: obstacleMessages[i]
+        });
+      }
+    }
+    
+    // Game Loop Variables
+    let gameSpeed = 4;
+    let animationId;
+    let lastTime = 0;
+    
+    // Listen for controls
+    function jump() {
+      if (!player.isJumping) {
+        player.vy = player.jumpForce;
+        player.isJumping = true;
+        player.currentImg = player.jumpImage;
+        // Play jump sound
+        document.getElementById('jumpSound').currentTime = 0;
+        document.getElementById('jumpSound').play();
+      }
+    }
+    
+    // Key and button events
+    document.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && gameState === 'playing') {
+        jump();
+      }
+    });
+    
+    jumpButton.addEventListener('click', () => {
+      if (gameState === 'playing') {
+        jump();
+      }
+    });
+    
+    // Start game on button click
+    startButton.addEventListener('click', () => {
+      instructionScreen.style.display = 'none';
+      gameContainer.style.display = 'block';
+      gameState = 'playing';
+      createObstacles();
+      animate();
+    });
+    
+    // Popup button events
+    continueButton.addEventListener('click', () => {
+      popup.style.display = 'none';
+      gameState = 'playing';
+      // small delay before resuming to ensure spacing
+      setTimeout(() => {
+        animate();
+      }, 300);
+    });
+    
+    restartButton.addEventListener('click', () => {
+      // Restart the game
+      window.location.reload();
+    });
+    
+    // Draw player
+    function drawPlayer() {
+      // If images haven't loaded, fallback to square
+      if (player.currentImg.complete) {
+        ctx.drawImage(player.currentImg, player.x, player.y, player.width, player.height);
+      } else {
+        ctx.fillStyle = varOrDefault('--primary', '#FADCD9');
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+      }
+    }
+    
+    // Draw obstacles
+    function drawObstacles() {
+      ctx.fillStyle = varOrDefault('--accent', '#D4AF37');
+      obstacles.forEach(ob => {
+        ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
+        // Draw text on obstacle
+        ctx.font = "10px Montserrat";
+        ctx.fillStyle = "#333";
+        ctx.fillText("?", ob.x + 12, ob.y + 25);
+      });
+    }
+    
+    // Helper function to read CSS variable with default
+    function varOrDefault(variable, def) {
+      return getComputedStyle(document.documentElement).getPropertyValue(variable) || def;
+    }
+    
+    // Update game elements
+    function update() {
+      // Move obstacles
+      obstacles.forEach(ob => {
+        ob.x -= gameSpeed;
+      });
+      
+      // Remove obstacles that have passed offscreen (if needed)
+      
+      // Gravity & jump
+      player.y += player.vy;
+      player.vy += player.gravity;
+      if (player.y + player.height >= 320) {
+        player.y = 320 - player.height;
+        player.vy = 0;
+        player.isJumping = false;
+        player.currentImg = player.image;
+      }
+      
+      // Check for collision with next obstacle
+      if (currentObstacleIndex < obstacles.length) {
+        let ob = obstacles[currentObstacleIndex];
+        if (player.x + player.width > ob.x && player.x < ob.x + ob.width &&
+            player.y + player.height > ob.y && player.y < ob.y + ob.height) {
+          // Collision detected, pause game and show popup
+          gameState = 'paused';
+          cancelAnimationFrame(animationId);
+          popupMessage.innerText = ob.message;
+          // For collision error, give option to continue or restart
+          continueButton.innerText = "Continue";
+          restartButton.style.display = "inline-block";
+          popup.style.display = 'flex';
+          // Move to next obstacle for next check if player continues
+          currentObstacleIndex++;
+          return;
+        } else if (ob.x + ob.width < player.x) {
+          // Obstacle passed successfully; show motivational popup if not already shown
+          if (!ob.passed) {
+            gameState = 'paused';
+            cancelAnimationFrame(animationId);
+            popupMessage.innerText = ob.message;
+            continueButton.innerText = "Continue Run";
+            restartButton.style.display = "none";
+            popup.style.display = 'flex';
+            ob.passed = true;
+            currentObstacleIndex++;
+            return;
+          }
+        }
+      }
+      
+      // Check if game is finished
+      if (currentObstacleIndex >= totalObstacles) {
+        gameState = 'paused';
+        cancelAnimationFrame(animationId);
+        // Show final congratulatory popup
+        popupMessage.innerText = "Trust me its u will like it";
+        continueButton.innerText = "Finish";
+        restartButton.style.display = "none";
+        popup.style.display = 'flex';
+        // When user clicks finish, show credits
+        continueButton.onclick = () => {
+          popup.style.display = 'none';
+          showCredits();
+        }
+        return;
+      }
+    }
+    
+    // Main animate function
+    function animate(timestamp) {
+      if (gameState !== 'playing') return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawPlayer();
+      drawObstacles();
+      update();
+      animationId = requestAnimationFrame(animate);
+    }
+    
+    // End Credits
+    function showCredits() {
+      gameContainer.style.display = 'none';
+      credits.style.display = 'block';
+    }
+  </script>
+</body>
+</html>
