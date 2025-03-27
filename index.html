@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <!-- Prevent pinch zoom on mobile, ensure full width scale -->
+  <!-- Prevent pinch zoom on mobile -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>run prachi run</title>
   <link href="https://fonts.googleapis.com/css?family=Playfair+Display|Montserrat" rel="stylesheet" />
@@ -17,9 +17,9 @@
     }
 
     html, body {
-      margin: 0; 
+      margin: 0;
       padding: 0;
-      width: 100%; 
+      width: 100%;
       height: 100%;
       background: var(--neutral);
       font-family: 'Montserrat', sans-serif;
@@ -76,7 +76,6 @@
       width: 100%;
       min-height: 100vh;
       box-sizing: border-box;
-      padding-bottom: 40px; /* space for mobile jump button */
     }
 
     /* The box for the game, fully responsive */
@@ -116,17 +115,18 @@
     /* The canvas: scaled visually to fit the box */
     #gameCanvas {
       display: block;
-      width: 100%;   
-      height: auto;  
+      width: 100%;
+      height: auto;
       border: 1px solid #ccc;
       background: var(--neutral);
     }
 
-    /* Mobile Jump Button: well below the box */
+    /* Mobile Jump Button near bottom for easy thumb reach */
     #mobileJumpWrapper {
       display: none; /* shown only if mobile */
       text-align: center;
-      margin-top: 30px;  /* bigger gap for thumbs */
+      margin-top: 50px;  /* bigger gap from the box */
+      margin-bottom: 30px; /* some bottom padding */
     }
     #jumpButton {
       padding: 15px 25px;
@@ -145,7 +145,7 @@
       align-items: center;
       justify-content: center;
       z-index: 1000;
-      transition: opacity 0.25s ease; /* fast but noticeable fade */
+      transition: opacity 0.25s ease;
     }
     #popup.show {
       display: flex;
@@ -207,7 +207,9 @@
   <!-- Instruction Screen -->
   <div id="instructionScreen">
     <h1>run prachi run</h1>
-    <p>Prachi, it’s time to leap over every obstacle in your way. Tap “Start” and use the jump button (or spacebar on desktop) to avoid collisions. Show the world what you’ve got!</p>
+    <p>Prachi, it’s time to leap over every obstacle in your way.  
+       Tap “Start” and use the jump button (or spacebar on desktop) to avoid collisions.  
+       Show us your fearless stride!</p>
     <button id="startButton">Start</button>
   </div>
 
@@ -219,7 +221,7 @@
       <canvas id="gameCanvas" width="800" height="400"></canvas>
     </div>
 
-    <!-- On mobile, jump button sits well below the box -->
+    <!-- On mobile, jump button sits near bottom of screen -->
     <div id="mobileJumpWrapper">
       <button id="jumpButton">Jump</button>
     </div>
@@ -252,12 +254,24 @@
   <audio id="jumpSound" src="https://freesound.org/data/previews/331/331912_3248244-lq.mp3"></audio>
 
   <script>
-    /* ========== Basic Setup ========== */
+    /* ========== Detect Mobile & Set Obstacle Sizes ========== */
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
     const mobileJumpWrapper = document.getElementById('mobileJumpWrapper');
-    if (isMobile) mobileJumpWrapper.style.display = 'block';
+    if (isMobile) {
+      mobileJumpWrapper.style.display = 'block';
+    }
 
-    // DOM elements
+    // We'll set different obstacle sizes for desktop vs mobile
+    let obstacleWidth, obstacleHeight;
+    if (isMobile) {
+      obstacleWidth = 80; 
+      obstacleHeight = 80;
+    } else {
+      obstacleWidth = 60; 
+      obstacleHeight = 60;
+    }
+
+    /* ========== DOM Elements ========== */
     const instructionScreen = document.getElementById('instructionScreen');
     const startButton = document.getElementById('startButton');
     const gameContainer = document.getElementById('gameContainer');
@@ -266,7 +280,6 @@
     const ctx = canvas.getContext('2d');
 
     const popup = document.getElementById('popup');
-    const popupContent = document.getElementById('popupContent');
     const popupMessage = document.getElementById('popupMessage');
     const continueButton = document.getElementById('continueButton');
     const restartButton = document.getElementById('restartButton');
@@ -276,29 +289,30 @@
     const progressFill = document.getElementById('progressFill');
     const jumpButton = document.getElementById('jumpButton');
 
-    // Game variables
+    /* ========== Game Variables ========== */
     let gameState = 'instructions';
     let animationId;
     const totalObstacles = 10;
     let currentObstacleIndex = 0;
     let obstacles = [];
     let gameSpeed = 4;
+    const obstacleGap = 500; // spacing between obstacles
 
-    // Runner image is bigger on screen, but collision box is smaller
-    const drawWidth = 90;  // displayed width of runner image
-    const drawHeight = 90; // displayed height of runner image
+    /* Runner bigger for both mobile & desktop */
+    const drawWidth = isMobile ? 120 : 120;  // same size for now, can tweak
+    const drawHeight = isMobile ? 120 : 120; // same size for simplicity
 
-    // We'll keep a smaller bounding box for collisions
-    const boundingBoxWidth = 50;
-    const boundingBoxHeight = 50;
+    // Smaller bounding box for collisions
+    const boundingBoxWidth = 60;
+    const boundingBoxHeight = 60;
 
-    // Player object
+    // Player
     const player = {
       x: 50,
-      y: 400 - drawHeight, // on "ground"
+      y: canvas.height - drawHeight,
       vy: 0,
-      gravity: 0.5,    // stays in air a bit
-      jumpForce: -12,  // decent jump
+      gravity: 0.5,
+      jumpForce: -12,
       isJumping: false,
       image: new Image(),
       boundingOffsetX: (drawWidth - boundingBoxWidth)/2,
@@ -306,21 +320,17 @@
     };
     player.image.src = 'normp.png';
 
-    // Obstacle config: bigger but not too big
-    const obstacleWidth = 70;
-    const obstacleHeight = 70;
-    const obstacleGap = 500; // bigger gap
-    // Motivational messages referencing Prachi
+    // Obstacle messages (slightly personal to Prachi, not corny)
     const obstacleMessages = [
-      "Keep going, Prachi—this is your moment!",
-      "No obstacle can stop your stride!",
-      "Believe in every leap you take!",
-      "You're unstoppable, Prachi!",
-      "Confidence beats every barrier!",
-      "Leap over doubts and fears!",
-      "You're stronger than any hurdle!",
-      "Your spirit shines past any nightmare!",
-      "One jump at a time, keep pushing!",
+      "Prachi, keep that fearless stride going!",
+      "No challenge can break your momentum!",
+      "You're leaping over doubts like a pro!",
+      "Confidence is your greatest ally, Prachi!",
+      "Jump high—any hurdle is beatable!",
+      "Keep your eyes forward, unstoppable!",
+      "Your resilience outshines every barrier!",
+      "Stay strong, nightmares can’t hold you!",
+      "One step at a time—you're doing great!",
       "The finish line is yours, Prachi!"
     ];
 
@@ -334,6 +344,7 @@
       requestAnimationFrame(gameLoop);
     });
 
+    /* ========== Create Obstacles ========== */
     function createObstacles() {
       obstacles = [];
       let startX = canvas.width + 100;
@@ -349,7 +360,7 @@
       }
     }
 
-    /* ========== Game Loop ========== */
+    /* ========== Main Game Loop ========== */
     function gameLoop() {
       if (gameState !== 'playing') return;
 
@@ -357,6 +368,7 @@
 
       updatePlayer();
       updateObstacles();
+
       drawPlayer();
       drawObstacles();
 
@@ -368,24 +380,21 @@
       player.y += player.vy;
       player.vy += player.gravity;
 
-      // If on ground
       if (player.y + drawHeight >= canvas.height) {
         player.y = canvas.height - drawHeight;
         player.vy = 0;
         player.isJumping = false;
       }
     }
-
     function drawPlayer() {
       if (player.image.complete && player.image.naturalWidth > 0) {
         ctx.drawImage(player.image, player.x, player.y, drawWidth, drawHeight);
       } else {
-        // fallback: black rectangle
+        // fallback: black square
         ctx.fillStyle = '#000';
         ctx.fillRect(player.x, player.y, drawWidth, drawHeight);
       }
     }
-
     function jump() {
       if (!player.isJumping) {
         player.vy = player.jumpForce;
@@ -411,17 +420,14 @@
         ob.x -= gameSpeed;
       });
 
-      // Check collision or pass with the next obstacle
       if (currentObstacleIndex < obstacles.length) {
         let ob = obstacles[currentObstacleIndex];
         if (isCollision(ob)) {
-          // collision
           pauseGame("You hit the obstacle!", true);
           currentObstacleIndex++;
           updateScore(currentObstacleIndex);
         } 
         else if (!ob.passed && ob.x + ob.width < player.x + player.boundingOffsetX) {
-          // passed
           ob.passed = true;
           pauseGame(ob.message, false);
           currentObstacleIndex++;
@@ -430,18 +436,24 @@
       }
     }
 
+    /* ========== Draw Obstacles (Subtle Gradient) ========== */
     function drawObstacles() {
-      ctx.fillStyle = varOrDefault('--accent', '#D4AF37');
       obstacles.forEach(ob => {
+        // create a subtle vertical gradient
+        let grad = ctx.createLinearGradient(0, ob.y, 0, ob.y + ob.height);
+        grad.addColorStop(0, varOrDefault('--accent', '#D4AF37'));
+        grad.addColorStop(1, '#b3942b'); // slightly darker shade
+        ctx.fillStyle = grad;
         ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
-        // Mark with a "?" in the center
+
+        // mark with a small "?"
         ctx.font = "14px Montserrat";
         ctx.fillStyle = "#333";
         ctx.fillText("?", ob.x + ob.width/2 - 4, ob.y + ob.height/2 + 5);
       });
     }
 
-    // Collision check using smaller bounding box for the player
+    /* ========== Collision Check (Smaller Player Box) ========== */
     function isCollision(ob) {
       const playerHitboxX = player.x + player.boundingOffsetX;
       const playerHitboxY = player.y + player.boundingOffsetY;
@@ -458,11 +470,8 @@
       gameState = 'paused';
       cancelAnimationFrame(animationId);
 
-      // Show popup with fade-in
-      popup.classList.add('show');
-      setTimeout(() => popup.classList.add('visible'), 10);
-
       popupMessage.innerText = msg;
+      showPopup();
 
       // If we've cleared all obstacles, show final
       if (currentObstacleIndex >= totalObstacles) {
@@ -485,11 +494,15 @@
       requestAnimationFrame(gameLoop);
     }
 
+    function showPopup() {
+      popup.classList.add('show');
+      setTimeout(() => popup.classList.add('visible'), 10);
+    }
     function hidePopup() {
       popup.classList.remove('visible');
       setTimeout(() => {
         popup.classList.remove('show');
-      }, 250); // matches transition
+      }, 250);
     }
 
     restartButton.addEventListener('click', () => {
@@ -510,7 +523,7 @@
       credits.style.display = 'block';
     }
 
-    /* Helper to read CSS variable with fallback */
+    /* ========== Helper to read CSS variable with fallback ========== */
     function varOrDefault(variable, fallback) {
       const val = getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
       return val === '' ? fallback : val;
