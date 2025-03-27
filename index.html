@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Motivational Runner Game</title>
+  <title>run prachi run</title>
   <!-- Fonts: Playfair Display for headings, Montserrat for body -->
   <link href="https://fonts.googleapis.com/css?family=Playfair+Display|Montserrat" rel="stylesheet" />
   <style>
@@ -218,7 +218,7 @@
     let obstacles = [];
     const totalObstacles = 10;
     let currentObstacleIndex = 0;
-    let obstacleSpacing = 200; // pixels between obstacles (simulate 5 inches roughly)
+    let obstacleSpacing = 200; // pixels between obstacles
     
     // Player properties
     const player = {
@@ -234,9 +234,9 @@
       jumpImage: new Image(),
       currentImg: null
     };
-    // Set images (these will be replaced with normp.png and jumpp.png later)
-    player.image.src = 'normp.png';
-    player.jumpImage.src = 'jumpp.png';
+    // Set images: using runp.jpeg for normal running, jumpp.jpeg for jumping
+    player.image.src = 'runp.jpeg';
+    player.jumpImage.src = 'jumpp.jpeg';
     player.currentImg = player.image;
     
     // Define messages for obstacles (one for each, with one special for bad dreams)
@@ -263,7 +263,8 @@
           y: 320, // ground level
           width: 40,
           height: 40,
-          message: obstacleMessages[i]
+          message: obstacleMessages[i],
+          passed: false
         });
       }
     }
@@ -271,7 +272,6 @@
     // Game Loop Variables
     let gameSpeed = 4;
     let animationId;
-    let lastTime = 0;
     
     // Listen for controls
     function jump() {
@@ -280,8 +280,9 @@
         player.isJumping = true;
         player.currentImg = player.jumpImage;
         // Play jump sound
-        document.getElementById('jumpSound').currentTime = 0;
-        document.getElementById('jumpSound').play();
+        const jumpSound = document.getElementById('jumpSound');
+        jumpSound.currentTime = 0;
+        jumpSound.play();
       }
     }
     
@@ -311,43 +312,36 @@
     continueButton.addEventListener('click', () => {
       popup.style.display = 'none';
       gameState = 'playing';
-      // small delay before resuming to ensure spacing
+      // Resume animation after a short delay for spacing
       setTimeout(() => {
         animate();
       }, 300);
     });
     
     restartButton.addEventListener('click', () => {
-      // Restart the game
       window.location.reload();
     });
     
-    // Draw player
+    // Draw player (fallback to a square if image isn't loaded)
     function drawPlayer() {
-      // If images haven't loaded, fallback to square
-      if (player.currentImg.complete) {
+      if (player.currentImg.complete && player.currentImg.naturalWidth !== 0) {
         ctx.drawImage(player.currentImg, player.x, player.y, player.width, player.height);
       } else {
-        ctx.fillStyle = varOrDefault('--primary', '#FADCD9');
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--primary') || '#FADCD9';
         ctx.fillRect(player.x, player.y, player.width, player.height);
       }
     }
     
     // Draw obstacles
     function drawObstacles() {
-      ctx.fillStyle = varOrDefault('--accent', '#D4AF37');
+      ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#D4AF37';
       obstacles.forEach(ob => {
         ctx.fillRect(ob.x, ob.y, ob.width, ob.height);
-        // Draw text on obstacle
+        // Draw a "?" to indicate the message challenge
         ctx.font = "10px Montserrat";
         ctx.fillStyle = "#333";
         ctx.fillText("?", ob.x + 12, ob.y + 25);
       });
-    }
-    
-    // Helper function to read CSS variable with default
-    function varOrDefault(variable, def) {
-      return getComputedStyle(document.documentElement).getPropertyValue(variable) || def;
     }
     
     // Update game elements
@@ -356,8 +350,6 @@
       obstacles.forEach(ob => {
         ob.x -= gameSpeed;
       });
-      
-      // Remove obstacles that have passed offscreen (if needed)
       
       // Gravity & jump
       player.y += player.vy;
@@ -369,48 +361,44 @@
         player.currentImg = player.image;
       }
       
-      // Check for collision with next obstacle
+      // Check for collision or successful pass with the next obstacle
       if (currentObstacleIndex < obstacles.length) {
         let ob = obstacles[currentObstacleIndex];
+        // Collision detection
         if (player.x + player.width > ob.x && player.x < ob.x + ob.width &&
             player.y + player.height > ob.y && player.y < ob.y + ob.height) {
-          // Collision detected, pause game and show popup
           gameState = 'paused';
           cancelAnimationFrame(animationId);
           popupMessage.innerText = ob.message;
-          // For collision error, give option to continue or restart
           continueButton.innerText = "Continue";
           restartButton.style.display = "inline-block";
           popup.style.display = 'flex';
-          // Move to next obstacle for next check if player continues
           currentObstacleIndex++;
           return;
-        } else if (ob.x + ob.width < player.x) {
-          // Obstacle passed successfully; show motivational popup if not already shown
-          if (!ob.passed) {
-            gameState = 'paused';
-            cancelAnimationFrame(animationId);
-            popupMessage.innerText = ob.message;
-            continueButton.innerText = "Continue Run";
-            restartButton.style.display = "none";
-            popup.style.display = 'flex';
-            ob.passed = true;
-            currentObstacleIndex++;
-            return;
-          }
+        } 
+        // Successful pass: obstacle completely behind player
+        else if (ob.x + ob.width < player.x && !ob.passed) {
+          gameState = 'paused';
+          cancelAnimationFrame(animationId);
+          popupMessage.innerText = ob.message;
+          continueButton.innerText = "Continue Run";
+          restartButton.style.display = "none";
+          popup.style.display = 'flex';
+          ob.passed = true;
+          currentObstacleIndex++;
+          return;
         }
       }
       
-      // Check if game is finished
+      // Check if game is finished (all obstacles encountered)
       if (currentObstacleIndex >= totalObstacles) {
         gameState = 'paused';
         cancelAnimationFrame(animationId);
-        // Show final congratulatory popup
-        popupMessage.innerText = "Trust me its u will like it";
+        popupMessage.innerText = "Trust me, its u will like it";
         continueButton.innerText = "Finish";
         restartButton.style.display = "none";
         popup.style.display = 'flex';
-        // When user clicks finish, show credits
+        // Override continue button for final finish to show credits
         continueButton.onclick = () => {
           popup.style.display = 'none';
           showCredits();
@@ -420,7 +408,7 @@
     }
     
     // Main animate function
-    function animate(timestamp) {
+    function animate() {
       if (gameState !== 'playing') return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawPlayer();
